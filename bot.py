@@ -63,6 +63,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ydl_opts = {
                 'format': 'best[height<=720][ext=mp4]',
                 'outtmpl': f'{filename}.mp4',
+                'cookiefile': 'cookies.txt',
                 'progress_hooks': [progress_hook],
             }
             ext = 'mp4'
