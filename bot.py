@@ -3,13 +3,14 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 import yt_dlp
 import os
 
-BOT_TOKEN = '8077362820:AAEfjXLGxEd9UUv2hG4mDpbAp1D1I6GQ-iA'
+import logging
+logging.basicConfig(level=logging.INFO)
 
-# START command
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Send /download <YouTube_URL> to select format.")
 
-# /download command with format options
 async def download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 1:
         await update.message.reply_text("Usage: /download <YouTube_URL>")
@@ -23,10 +24,8 @@ async def download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🎧 Audio (MP3)", callback_data='audio')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
     await update.message.reply_text("Choose format:", reply_markup=reply_markup)
 
-# Handle button press
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -46,8 +45,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'outtmpl': f'{filename}.mp4',
             }
             ext = 'mp4'
-
-        elif format_choice == 'audio':
+        else:
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'outtmpl': f'{filename}.mp3',
@@ -74,7 +72,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await query.edit_message_text(f"❌ Error: {e}")
 
-# MAIN
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("download", download))
