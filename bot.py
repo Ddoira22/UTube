@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 import yt_dlp
 import os
+import asyncio
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -30,25 +31,50 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    url = context.user_data.get('yt_url', '')
-    if not url:
-        await query.edit_message_text("URL missing.")
+    if update.effective_user.id not in ALLOWED_USERS:
+        await query.edit_message_text("❌ Access denied.")
         return
 
-    format_choice = query.data
+    choice = query.data
+    url = context.user_data.get('yt_url', '')
     filename = "yt_download"
 
+    if choice == "cancel":
+        await query.edit_message_text("❌ Cancelled.")
+        return
+
+    progress_message = await query.message.reply_text("⏳ Starting download...")
+
+    download_progress = {"percent": 0}
+
+    def progress_hook(d):
+        if d['status'] == 'downloading':
+            percent = d.get('_percent_str', '').strip()
+            if percent:
+                download_progress["percent"] = percent
+                try:
+                    context.application.create_task(progress_message.edit_text(f"📥 Downloading: {percent}"))
+                except:
+                    pass
+        elif d['status'] == 'finished':
+            try:
+                context.application.create_task(progress_message.edit_text("✅ Download complete. Sending..."))
+            except:
+                pass
+
     try:
-        if format_choice == 'video':
+        if choice == 'video':
             ydl_opts = {
                 'format': 'best[height<=720][ext=mp4]',
                 'outtmpl': f'{filename}.mp4',
+                'progress_hooks': [progress_hook],
             }
             ext = 'mp4'
         else:
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'outtmpl': f'{filename}.mp3',
+                'progress_hooks': [progress_hook],
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -60,18 +86,38 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        with open(f'{filename}.{ext}', 'rb') as f:
-            if ext == 'mp4':
-                await query.message.reply_video(video=f)
-            else:
-                await query.message.reply_audio(audio=f)
+        file_path = f"{filename}.{ext}"
+        file_size = os.path.getsize(file_path) / (1024 * 1024)
 
-        os.remove(f'{filename}.{ext}')
-        await query.edit_message_text("✅ Done!")
+        with open(file_path, 'rb') as f:
+            if file_size < 49:
+                if ext == 'mp4':
+                    await query.message.reply_video(video=f)
+                else:
+                    await query.message.reply_audio(audio=f)
+            else:
+                await query.message.reply_document(document=f)
+
+        # Show live countdown before deletion
+        countdown_message = await query.message.reply_text("⚠️ File will be deleted from server in 1:00...")
+        for i in range(59, -1, -1):
+            await asyncio.sleep(1)
+            minutes = i // 60
+            seconds = i % 60
+            await countdown_message.edit_text(f"⚠️ File will be deleted from server in {minutes}:{seconds:02d}...")
+
+        # Final deletion
+        try:
+            os.remove(file_path)
+            logging.info(f"✅ Auto-deleted {file_path}")
+            await countdown_message.edit_text("✅ File deleted from server.")
+        except Exception as e:
+            logging.error(f"❌ Failed to delete file: {e}")
+            await countdown_message.edit_text("⚠️ Failed to delete file from server.")
 
     except Exception as e:
         await query.edit_message_text(f"❌ Error: {e}")
-
+        logging.error(f"Download failed: {e}")
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("download", download))
