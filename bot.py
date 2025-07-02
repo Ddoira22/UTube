@@ -30,11 +30,10 @@ async def download(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
-    if update.effective_user.id not in ALLOWED_USERS:
-        await query.edit_message_text("❌ Access denied.")
-        return
-
+    
+    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Welcome!")
+    
     choice = query.data
     url = context.user_data.get('yt_url', '')
     filename = "yt_download"
@@ -100,11 +99,15 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Show live countdown before deletion
         countdown_message = await query.message.reply_text("⚠️ File will be deleted from server in 1:00...")
-        for i in range(59, -1, -1):
+        for i in range(299, -1, -1):
             await asyncio.sleep(1)
             minutes = i // 60
             seconds = i % 60
-            await countdown_message.edit_text(f"⚠️ File will be deleted from server in {minutes}:{seconds:02d}...")
+            if i % 5 == 0 or i < 10:  # Update every 5s, and every second during last 10s
+                try:
+                    await countdown_message.edit_text(f"⚠️ File will be deleted from server in {minutes}:{seconds:02d}...")
+                except:
+                    pass  # Ignore edit errors
 
         # Final deletion
         try:
