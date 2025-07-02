@@ -31,9 +31,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Welcome!")
-    
     choice = query.data
     url = context.user_data.get('yt_url', '')
     filename = "yt_download"
